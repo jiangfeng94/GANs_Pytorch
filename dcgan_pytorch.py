@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import argparse
 import os
-import torchvision.transforms as transforms
-from torchvision import datasets, transforms
+from torchvision import  transforms
 from torch.autograd import Variable
 from torch import Tensor
+from torchvision.datasets import ImageFolder
 from torchvision.utils import save_image
 import numpy as np
 parser =argparse.ArgumentParser()
@@ -17,7 +17,7 @@ parser.add_argument('--b2', type=float, default=0.999, help='adam: decay of firs
 parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
 parser.add_argument('--latent_dim', type=int, default=100, help='dimensionality of the latent space')
 parser.add_argument('--img_size', type=int, default=32, help='size of each image dimension')
-parser.add_argument('--channels', type=int, default=1, help='number of image channels')
+parser.add_argument('--channels', type=int, default=3, help='number of image channels')
 parser.add_argument('--sample_interval', type=int, default=400, help='interval between image sampling')
 opt = parser.parse_args()
 print(opt)
@@ -94,29 +94,45 @@ def weights_init_normal(m):
     elif classname.find('BatchNorm2d')!= -1:
         torch.nn.init.normal_(m.weight.data,1.0,0.02)
         torch.nn.init.constant_(m.bias.data,0.0)
-
-
 generator.apply(weights_init_normal)
 discriminator.apply(weights_init_normal)
-
-
-train_dataset = datasets.MNIST(root='./mnist_data/',train=True,download=True,
-        transform =transforms.Compose([
-        transforms.Resize(opt.img_size),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ]))
-dataloader =torch.utils.data.DataLoader(dataset=train_dataset,batch_size=opt.batch_size,shuffle=True)
-
 # Optimizers
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-
-
 Tensor =torch.cuda.FloatTensor
 
+
+# torchvision.datasets.ImageFolder() 函数不能用 =。=很神奇，bebug一晚上搞不定
+# 只能自己手写的Dataset类和loader函数
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+import glob
+def default_loader(path):
+    img =Image.open(path).convert('RGB')
+    img = img.resize((opt.img_size,opt.img_size))
+    return img
+class MyDataset(Dataset):
+    def __init__(self, rootpath, transform=None, target_transform=None,loader=default_loader):
+        imgs=glob.glob(rootpath)
+        self.imgs = imgs
+        self.transform = transform
+        self.target_transform = target_transform
+        self.loader = loader
+
+    def __getitem__(self, index):
+        fn = self.imgs[index]
+        img = self.loader(fn)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img
+    def __len__(self):
+        return len(self.imgs)
+train_data =MyDataset("D:/Desktop/data_1018/6/*.jpg",transform=transforms.ToTensor())
+train_loader = DataLoader(dataset=train_data, batch_size=64, shuffle=True)
+
+
 for epoch in range(opt.n_epochs):
-    for i,(imgs,_) in enumerate(dataloader):
+    for i,imgs in enumerate(train_loader):
         valid = Variable(Tensor(imgs.shape[0], 1).fill_(1.0), requires_grad=False)
         fake = Variable(Tensor(imgs.shape[0], 1).fill_(0.0), requires_grad=False)
         real_imgs = Variable(imgs.type(Tensor))
@@ -127,15 +143,14 @@ for epoch in range(opt.n_epochs):
         g_loss = adversarial_loss(discriminator(gen_imgs), valid)
         g_loss.backward()
         optimizer_G.step()
-
         optimizer_D.zero_grad()
         real_loss = adversarial_loss(discriminator(real_imgs), valid)
         fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
         d_loss = (real_loss + fake_loss) / 2
         d_loss.backward()
         optimizer_D.step()
-        print ("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]" % (epoch, opt.n_epochs, i, len(dataloader),
+        print ("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]" % (epoch, opt.n_epochs, i, len(train_loader),
                                                             d_loss.item(), g_loss.item()))
-        batches_done = epoch * len(dataloader) + i
+        batches_done = epoch * len(train_loader) + i
         if batches_done % opt.sample_interval == 0:
-            save_image(gen_imgs.data[:25], 'images/%d.png' % batches_done, nrow=5, normalize=True)
+            save_image(gen_imgs.data[:25], '../images/%d.png' % batches_done, nrow=5, normalize=True)
