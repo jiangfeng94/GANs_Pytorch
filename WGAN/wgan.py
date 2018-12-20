@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchsize', type=int, default=256, help='size of the batches')
-parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
+parser.add_argument('--lr', type=float, default=0.0002, help='learning rate')
 parser.add_argument('--z_dim', type=int, default=100, help='dimensionality of the latent space')
 parser.add_argument('--img_size', type=int, default=28, help='size of each image dimension')
 parser.add_argument('--channels', type=int, default=1, help='number of image channels')
@@ -104,5 +104,5 @@ for epoch in range(100):
                                                             batches_done % len(dataloader), len(dataloader),
                                                             loss_D.item(), loss_G.item()))
         if batches_done % 100 == 0:
-            save_image(gen_imgs.data[:100], '../../mnist_wgan/%d.png' % (epoch * len(dataloader) + i), nrow=10, normalize=True)
+            save_image(gen_imgs.data[:100], '../../output/mnist_wgan/%d.png' % (epoch * len(dataloader) + i), nrow=10, normalize=True)
         batches_done += 1
