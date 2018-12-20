@@ -9,7 +9,7 @@ from torchvision.utils import save_image
 import torch.nn as nn
 from torch.autograd import Variable
 parser = argparse.ArgumentParser()
-parser.add_argument('--batchsize', type=int, default=256, help='size of the batches')
+parser.add_argument('--batchsize', type=int, default=64, help='size of the batches')
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate')
 parser.add_argument('--z_dim', type=int, default=100, help='dimensionality of the latent space')
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -118,5 +118,5 @@ for epoch in range(100):
         if batches_done % 100 == 0:
             if not os.path.exists('../../output/mnist_wgan-pg'):
                 os.mkdir('../../output/mnist_wgan-pg')
-            save_image(gen_imgs.data[:100], '../../output/mnist_wgan-pg/%d.png' % (epoch * len(dataloader) + i), nrow=10, normalize=True)
+            save_image(gen_imgs.data[:64], '../../output/mnist_wgan-pg/%d.png' % (epoch * len(dataloader) + i), nrow=8, normalize=True)
         batches_done += 1
