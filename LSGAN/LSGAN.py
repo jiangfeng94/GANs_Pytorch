@@ -8,13 +8,13 @@ from torchvision.utils import save_image
 from torch.autograd import Variable
 parser =argparse.ArgumentParser()
 parser.add_argument('--data_path',default ='D:/Desktop/celeba')
-parser.add_argument('--img_size',type=int,default=128)
+parser.add_argument('--img_size',type=int,default=32)
 parser.add_argument('--batchsize',type=int,default=128)
 parser.add_argument('--netD',default='',)
 parser.add_argument('--netG',default='',)
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
-parser.add_argument('--z_num',type=int,default=200)
+parser.add_argument('--z_num',type=int,default=100)
 opt =parser.parse_args()
 
 transforms = torchvision.transforms.Compose([
@@ -35,72 +35,61 @@ def weights_init(m):
     elif classname.find('BatchNorm')!= -1:
         m.weight.data.normal_(1.0,0.02)
         m.bias.data.fill_(0)
-class Discriminator(nn.Module):
-    def __init__(self):
-        super(Discriminator,self).__init__()
-        self.dis =nn.Sequential(
-            # 3×128×128
-            nn.Conv2d(3,64,4,2,1,bias=False),
-            nn.LeakyReLU(0.2,inplace=True),
-            # 64×64×64
-            nn.Conv2d(64,128,4,2,1,bias=False),
-            nn.BatchNorm2d(128),
-            nn.LeakyReLU(0.2,inplace=True),
-            # 128×32×32
-            nn.Conv2d(128,256,4,2,1,bias=False),
-            nn.BatchNorm2d(256),
-            nn.LeakyReLU(0.2,inplace=True),
-            # 256×16×16
-            nn.Conv2d(256,512,4,2,1,bias=False),
-            nn.BatchNorm2d(512),
-            nn.LeakyReLU(0.2,inplace=True),
-            # 512×8×8
-            nn.Conv2d(512,1024,4,2,1,bias=False),
-            nn.BatchNorm2d(1024),
-            nn.LeakyReLU(0.2,inplace=True),
-            # 1024×4×4
-            nn.Conv2d(1024,1,4,1,0,bias=False),
-            nn.Sigmoid()
-        )
-    def forward(self,input):
-        output =self.dis(input)
-        return output.view(-1,1).squeeze(1)
-
 class Generator(nn.Module):
     def __init__(self):
-        super(Generator,self).__init__()
-        self.l1 = nn.Sequential(nn.Linear(opt.z_num, 1024*4*4))
-        self.gen =nn.Sequential(
-            nn.ConvTranspose2d(1024,1024,4,1,0,bias=False),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(True),
-            # 1024*4*4
-            nn.ConvTranspose2d(1024,512,4,2,1,bias=False),
-            nn.BatchNorm2d(512),
-            nn.ReLU(True),
-            # 512*8*8
-            nn.ConvTranspose2d(512,256,4,2,1,bias=False),
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            # 256*16*16
-            nn.ConvTranspose2d(256,128,4,2,1,bias=False),
-            nn.BatchNorm2d(128),
-            nn.ReLU(True), 
-            # 128*32*32
-             nn.ConvTranspose2d(128,64,4,2,1,bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(True), 
-            # 64*64*64
-            nn.ConvTranspose2d(64,3,4,2,1,bias=False),
-            nn.Tanh()
-            # 3*128*128
-        )
-    def forward(self,input):
-        output =self.l1(input)
-        output =output.view(opt.batchsize,1024,4,4)
-        output =self.gen(output)
-        return output
+        super(Generator, self).__init__()
 
+        self.init_size = opt.img_size // 4
+        self.l1 = nn.Sequential(nn.Linear(opt.z_num, 128*self.init_size**2))
+
+        self.conv_blocks = nn.Sequential(
+            nn.Upsample(scale_factor=2),
+            nn.Conv2d(128, 128, 3, stride=1, padding=1),
+            nn.BatchNorm2d(128, 0.8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Upsample(scale_factor=2),
+            nn.Conv2d(128, 64, 3, stride=1, padding=1),
+            nn.BatchNorm2d(64, 0.8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64, 3, 3, stride=1, padding=1),
+            nn.Tanh()
+        )
+
+    def forward(self, z):
+        out = self.l1(z)
+        out = out.view(out.shape[0], 128, self.init_size, self.init_size)
+        img = self.conv_blocks(out)
+        return img
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+
+        def discriminator_block(in_filters, out_filters, bn=True):
+            block = [   nn.Conv2d(in_filters, out_filters, 3, 2, 1),
+                        nn.LeakyReLU(0.2, inplace=True),
+                        nn.Dropout2d(0.25)]
+            if bn:
+                block.append(nn.BatchNorm2d(out_filters, 0.8))
+            return block
+
+        self.model = nn.Sequential(
+            *discriminator_block(3, 16, bn=False),
+            *discriminator_block(16, 32),
+            *discriminator_block(32, 64),
+            *discriminator_block(64, 128),
+        )
+
+        # The height and width of downsampled image
+        ds_size = opt.img_size // 2**4
+        self.adv_layer = nn.Linear(128*ds_size**2, 1)
+
+    def forward(self, img):
+        out = self.model(img)
+        out = out.view(out.shape[0], -1)
+        validity = self.adv_layer(out)
+
+        return validity
 # 关键处 MSELOSS 替代 BECLOSS
 adversarial_loss = torch.nn.MSELoss()
 #adversarial_loss = nn.BCELoss()
