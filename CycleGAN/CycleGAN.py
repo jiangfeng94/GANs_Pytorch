@@ -130,5 +130,5 @@ for epoch in range(opt.startepoch,100):
         
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt.sample_interval == 0:
-            img_sample = torch.cat((real_A.data, fake_B.data,fake_A_.data,real_B.data, fake_A.data,fake_B_.data), 0)
+            img_sample = torch.cat((real_A.data, fake_B.data,fake_B_.data,real_B.data, fake_A.data,fake_A_.data), 0)
             save_image(img_sample, '../../output/cyclegan_images/%s.png' % (batches_done), nrow=3, normalize=True)
