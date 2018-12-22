@@ -5,6 +5,7 @@ import numpy as np
 import torch,torchvision
 import itertools
 from torch.autograd import Variable
+from torchvision.utils import save_image
 from utils import weights_init,ImageDataset,ReplayBuffer
 from models import Generator,Discriminator
 from torch.utils.data import DataLoader
@@ -17,6 +18,8 @@ parser.add_argument('--b2', type=float, default=0.999, help='adam: decay of firs
 parser.add_argument('--img_height', type=int, default=256, help='size of image height')
 parser.add_argument('--img_width', type=int, default=256, help='size of image width')
 parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
+parser.add_argument('--sample_interval', type=int, default=50, help='interval between sampling images from generators')
+
 opt = parser.parse_args()
 # Loss
 gan_loss =torch.nn.MSELoss()
@@ -122,4 +125,10 @@ for epoch in range(opt.startepoch,100):
         loss_D_B.backward()
         optimizer_D_B.step()
         loss_D = (loss_D_A + loss_D_B) / 2
-        print(loss_D.item(), loss_G.item())
+        print("[Epoch %d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, identity: %f]" 
+        %(epoch, i, len(dataloader), loss_D.item(), loss_G.item(),loss_GAN.item(), loss_cycle.item(),loss_id.item()))
+        
+        batches_done = epoch * len(dataloader) + i
+        if batches_done % opt.sample_interval == 0:
+            img_sample = torch.cat((real_A.data, fake_B.data,fake_A_.data,real_B.data, fake_A.data,fake_B_.data), 0)
+            save_image(img_sample, '../../output/cyclegan_images/%s.png' % (batches_done), nrow=3, normalize=True)
