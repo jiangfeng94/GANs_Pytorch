@@ -17,6 +17,23 @@ def weights_init(m):
     elif classname.find('BatchNorm2d') != -1:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
+class ImageDataset_night2day(Dataset):
+    def __init__(self,root, unaligned=False,transforms_=None, mode='train'):
+        self.transform = transforms.Compose(transforms_)
+        self.files = sorted(glob.glob(os.path.join(root,'%s'%mode)+'/*.*'))
+    def __getitem__(self,index):
+        file_path = self.files[index]
+        img_all = Image.open(file_path).convert('RGB')
+        w =img_all.size[0]//2
+        h =img_all.size[1]
+        img_A =img_all.crop((0, 0, w, h))
+        img_B =img_all.crop((w, 0, w*2, h))
+        item_A = self.transform(img_A)
+        item_B = self.transform(img_B)
+        return {'A': item_A, 'B': item_B}
+    def __len__(self):
+        return len(self.files)
+
 
 
 class ImageDataset(Dataset):

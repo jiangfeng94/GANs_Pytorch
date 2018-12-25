@@ -3,7 +3,7 @@ import torch,torchvision
 import numpy as np
 from torch.autograd import Variable
 from torchvision.utils import save_image
-from utils import weights_init,ImageDataset
+from utils import weights_init,ImageDataset,ImageDataset_night2day
 from models import Generator,Discriminator,Encoder
 from torch.utils.data import DataLoader
 from PIL import Image
@@ -45,8 +45,8 @@ FloatTensor =torch.cuda.FloatTensor
 transforms_ = [ torchvision.transforms.Resize((opt.img_height, opt.img_width), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) ]
-dataloader = DataLoader(ImageDataset("D:/project/赵老师的IDEA/CycleGAN/input/apple2orange", transforms_=transforms_, unaligned=True),
-                        batch_size=opt.batchsize, shuffle=True)#, num_workers=opt.n_cpu)
+dataloader = DataLoader(ImageDataset_night2day("D:/DATASET/night2day", transforms_=transforms_, unaligned=True),
+                        batch_size=opt.batchsize, drop_last=True,shuffle=True)#, num_workers=opt.n_cpu)
 
 def reparameterization(mu, logvar):
     std = torch.exp(logvar / 2)
@@ -96,7 +96,7 @@ for epoch in range(opt.epochs):
         batches_done = epoch * len(dataloader) + i
         print("[Epoch %d] [Batch %d/%d] [D_VAE loss: %f D_LR loss: %f] [G loss: %f, pix: %f, latent: %f]" % (epoch, i, len(dataloader), loss_D_VAE.item(), loss_D_LR.item(),loss_GE.item(), loss_pixel.item(),loss_latent.item()))
 
-        if batches_done % 50 == 0:
-            img_sample = torch.cat((real_A.data, fake_B.data,real_B.data), 0)
-            save_image(img_sample, '../../output/bicyclegan/%s.png' % (batches_done), nrow=3, normalize=True)
+        if batches_done % 20 == 0:
+            img_sample = torch.cat((real_A, real_B,fake_B), -1)
+            save_image(img_sample, '../../output/bicyclegan/%s.png' % (batches_done), nrow=4, normalize=True)
 
