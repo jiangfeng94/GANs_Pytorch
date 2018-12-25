@@ -20,6 +20,7 @@ class Encoder(nn.Module):
         out = self.feature_extractor(img)
         out = self.pooling(out)
         out = out.view(out.size(0), -1)
+
         mu = self.fc_mu(out)
         logvar = self.fc_logvar(out)
         return mu, logvar
@@ -67,15 +68,13 @@ class Generator(nn.Module):
         self.down4 = UNetDown(256, 512, dropout=0.5)
         self.down5 = UNetDown(512, 512, dropout=0.5)
         self.down6 = UNetDown(512, 512, dropout=0.5)
-        self.down7 = UNetDown(512, 512, dropout=0.5)
-        self.down8 = UNetDown(512, 512, normalize=False, dropout=0.5)
+        self.down7 = UNetDown(512, 512,normalize=False,  dropout=0.5)
         self.up1 = UNetUp(512, 512, dropout=0.5)
         self.up2 = UNetUp(1024, 512, dropout=0.5)
         self.up3 = UNetUp(1024, 512, dropout=0.5)
-        self.up4 = UNetUp(1024, 512, dropout=0.5)
-        self.up5 = UNetUp(1024, 256)
-        self.up6 = UNetUp(512, 128)
-        self.up7 = UNetUp(256, 64)
+        self.up4 = UNetUp(1024, 256)
+        self.up5 = UNetUp(512, 128)
+        self.up6 = UNetUp(256, 64)
         self.finallayer =nn.Sequential(
             nn.ConvTranspose2d(128, channels, 4, stride=2, padding=1),
             nn.Tanh() 
@@ -89,15 +88,13 @@ class Generator(nn.Module):
         d5 = self.down5(d4)
         d6 = self.down6(d5)
         d7 = self.down7(d6)
-        d8 = self.down8(d7)
-        u1 = self.up1(d8, d7)
-        u2 = self.up2(u1, d6)
-        u3 = self.up3(u2, d5)
-        u4 = self.up4(u3, d4)
-        u5 = self.up5(u4, d3)
-        u6 = self.up6(u5, d2)
-        u7 = self.up7(u6, d1)
-        out = self.finallayer(u7)
+        u1 = self.up1(d7, d6)
+        u2 = self.up2(u1, d5)
+        u3 = self.up3(u2, d4)
+        u4 = self.up4(u3, d3)
+        u5 = self.up5(u4, d2)
+        u6 = self.up6(u5, d1)
+        out = self.finallayer(u6)
         return out
 
 class Discriminator(nn.Module):
@@ -125,7 +122,9 @@ class Discriminator(nn.Module):
             )
 
         self.downsample = nn.AvgPool2d(in_channels, stride=2, padding=[1, 1], count_include_pad=False)
-
+    def compute_loss(self, x, gt):
+        loss = sum([torch.mean((out - gt)**2) for out in self.forward(x)])
+        return loss
     def forward(self, x):
         outputs = []
         for m in self.models:
