@@ -15,7 +15,7 @@ parser.add_argument('--lr',type=float,default=0.0002)
 parser.add_argument('--b1',type=float,default=0.5)
 parser.add_argument('--b2',type=float,default=0.999)
 parser.add_argument('--z_dim',type=int,default=100)
-parser.add_argument('--channels',type=int,default=3)
+parser.add_argument('--channels',type=int,default=1)
 parser.add_argument('--img_size',type=int,default=32)
 opt =parser.parse_args()
 def weights_init(m):
@@ -92,13 +92,21 @@ transforms = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
 dataset = torchvision.datasets.ImageFolder("D:/DATASET/celeba", transform=transforms)
-dataloader = torch.utils.data.DataLoader(
+dataloader2 = torch.utils.data.DataLoader(
     dataset=dataset,
     batch_size=opt.batchsize,
     shuffle=True,
     drop_last=True,
 )
-
+os.makedirs('../../data/mnist', exist_ok=True)
+dataloader = torch.utils.data.DataLoader(
+    datasets.MNIST('../../data/mnist', train=True, download=True,
+                   transform=torchvision.transforms.Compose([
+                       torchvision.transforms.Resize(opt.img_size),
+                       torchvision.transforms.ToTensor(),
+                       torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                   ])),
+    batch_size=opt.batchsize, shuffle=True)
 
 gamma = 0.75
 lambda_k = 0.001
